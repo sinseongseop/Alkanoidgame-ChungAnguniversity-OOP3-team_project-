@@ -45,12 +45,14 @@ D3DXMATRIX g_mProj;
 #define M_HEIGHT 0.1
 #define DECREASE_RATE 0.999999 //공의 감속 관련
 
+
 // -----------------------------------------------------------------------------
 // CSphere class definition
 // -----------------------------------------------------------------------------
 
 class CSphere {
 private :
+	int						no_change_time = 0; // 이값이 양수인 경우 충돌을 무시한다.
 	float					center_x, center_y, center_z;
     float                   m_radius;
 	float					m_velocity_x;
@@ -71,15 +73,23 @@ public:
     ~CSphere(void) {}
 
 public:
-	float get_centerx() { //center_x 얻기
+	int get_nochangetime() { // no_change_time 얻기
+		return no_change_time;
+	}
+	
+	void set_nochangetime(int time) { // no_change_time 값 설정
+		no_change_time = time;
+	}
+
+	inline float get_centerx() { //center_x 얻기
 		return center_x;
 	}
 
-	float get_centery() { //center_y 얻기
+	inline float get_centery() { //center_y 얻기
 		return center_y;
 	}
 
-	float get_centerz() { //center_z 얻기
+	inline float get_centerz() { //center_z 얻기
 		return center_z;
 	}
 
@@ -99,7 +109,7 @@ public:
 		return white_ball;
 	}
 	
-	bool is_balloutside() { // 공의 정해진 장소 밖으로 나갔는 가?
+	inline bool is_balloutside() { // 공의 정해진 장소 밖으로 나갔는 가?
 		if (center_x < -3.2 || center_x>3.2 || center_z > 4.8 || center_z < -4.8) {
 			return true;
 		}
@@ -116,7 +126,7 @@ public:
 	}
 
 	
-	bool create(IDirect3DDevice9* pDevice, D3DXCOLOR color = d3d::WHITE)
+	bool create(IDirect3DDevice9* pDevice, D3DXCOLOR color = d3d::WHITE, float radius = M_RADIUS) // Default값 반지름을 가지면서 원할시 반지름 변경 가능.
     {
         if (NULL == pDevice)
             return false;
@@ -126,6 +136,7 @@ public:
         m_mtrl.Specular = color;
         m_mtrl.Emissive = d3d::BLACK;
         m_mtrl.Power    = 5.0f;
+		m_radius = radius; // 반지름 다른 공 만들기 가능 
 		
         if (FAILED(D3DXCreateSphere(pDevice, getRadius(), 50, 50, &m_pSphereMesh, NULL)))
             return false;
@@ -150,11 +161,15 @@ public:
 		m_pSphereMesh->DrawSubset(0);
     }
 	
-    bool hasIntersected(CSphere& ball) 
+    inline bool hasIntersected(CSphere& ball) 
 	{
+		if (ball.get_nochangetime() > 0) { // 충돌한지 너무 작은 시간인 경우
+			return false; //충돌 안했다고 판단
+		}
+		
 		float distance_square = pow((ball.center_x-this->center_x), 2) + pow(ball.center_z-this->center_z, 2); // 두 구의 중점 사이의 거리의 제곱
 		float distance = abs(pow(distance_square, 0.5)); // 두 구 중점 사이의 거리
-		if (distance<= 2*M_RADIUS) { // 두 구의 반지름의 합보다 거리가 작으면 충돌상태
+		if (distance<= (ball.getRadius()+this->getRadius())+0.001) { // 두 구의 반지름의 합보다 거리가 작으면 충돌상태 
 			return true;
 		}
 		else {
@@ -165,10 +180,12 @@ public:
 	
 	void hitBy(CSphere& ball) 
 	{ 
+		
 		if (hasIntersected(ball)) { // 충돌이 발생 할때
+			ball.set_nochangetime(5); // 5번 돌때 동안은 변화 무시
 			std::random_device rd;
 			std::mt19937 gen(rd());
-
+			
 			// 원하는 분포와 범위로 랜덤 실수 생성
 			std::uniform_real_distribution<double> distribution(-1.0, 1.0);
 			double random_number1 = distribution(gen);
@@ -266,8 +283,8 @@ public:
 		this->setPower(getVelocity_X() * rate, getVelocity_Z() * rate);
 	}
 
-	double getVelocity_X() { return this->m_velocity_x;	}
-	double getVelocity_Z() { return this->m_velocity_z; }
+	inline double getVelocity_X() { return this->m_velocity_x;	}
+	inline double getVelocity_Z() { return this->m_velocity_z; }
 
 	void setPower(double vx, double vz)
 	{
@@ -297,11 +314,12 @@ public:
 	{
 		D3DXMATRIX m;
 		center_x=x;	center_y=y;	center_z=z;
+		m_radius= y;
 		D3DXMatrixTranslation(&m, x, y, z);
 		setLocalTransform(m);
 	}
 	
-	float getRadius(void)  const { return (float)(M_RADIUS);  }
+	float getRadius(void)  const { return (float)(m_radius);  } // 반지름 다른거 존재 가능하므로 반지름으로 수정
     const D3DXMATRIX& getLocalTransform(void) const { return m_mLocal; }
     void setLocalTransform(const D3DXMATRIX& mLocal) { m_mLocal = mLocal; }
     D3DXVECTOR3 getCenter(void) const
@@ -364,7 +382,7 @@ public:
         return true;
     }
 
-	void setwallnum(int wall_num) {
+	inline void setwallnum(int wall_num) {
 		this->wall_num = wall_num;
 	}
 
@@ -385,22 +403,27 @@ public:
 		m_pBoundMesh->DrawSubset(0);
     }
 	
-	bool hasIntersected(CSphere& ball)  // 공이 벽과 충돌하는 경우
+	inline bool hasIntersected(CSphere& ball)  // 공이 벽과 충돌하는 경우
 	{
+		if (ball.get_nochangetime() > 0) { // 충돌한지 너무 작은 시간인 경우
+			ball.set_nochangetime(ball.get_nochangetime() - 1);
+			return false; // 벽끼임 방지를 위해 충돌 안했다고 판단
+		}
+		
 		switch (this->wall_num) {
 
 			case 0: //왼쪽 벽
-				if (m_x+m_width/2+0.001>= (ball.get_centerx() - M_RADIUS)) {
+				if (m_x+m_width/2+0.001>= (ball.get_centerx() - ball.getRadius())) {
 					return true;
 				}
 				break;
 			case 1:// 위의 벽
-				if (m_z-m_depth/2-0.001 <= ball.get_centerz() + M_RADIUS) {
+				if (m_z-m_depth/2-0.001 <= ball.get_centerz() + ball.getRadius()) {
 					return true;
 				}
 				break;
 			case 2: // 오른쪽 벽
-				if (m_x-m_width/2-0.001 <= ball.get_centerx() + M_RADIUS) {
+				if (m_x-m_width/2-0.001 <= ball.get_centerx() + ball.getRadius()) {
 					return true;
 				}
 				break;
@@ -416,6 +439,7 @@ public:
 	void hitBy(CSphere& ball) 
 	{
 		if (hasIntersected(ball)){
+			ball.set_nochangetime(5); // 5번 돌때 동안은 변화 무시
 			float speedup = 0;
 			if (abs(ball.getVelocity_X()) <= 1.5) { // 공이 너무 느려짐을 방지
 				if (ball.getVelocity_X() > 0) {
@@ -447,7 +471,7 @@ public:
 				ball.setPower(ball.getVelocity_X(), -(ball.getVelocity_Z()+0.002));
 				break;
 			case 2: // 오른쪽 벽
-				ball.setPower(-(ball.getVelocity_X()+0.001), ball.getVelocity_Z());
+				ball.setPower(-(ball.getVelocity_X()+0.002), ball.getVelocity_Z());
 				break;
 			default:
 				break;
@@ -575,6 +599,8 @@ CSphere	g_sphere[10];
 CSphere	g_target_blueball;
 CLight	g_light;
 
+
+
 double g_camera_pos[3] = {0.0, 0.0, -0.0};
 
 // -----------------------------------------------------------------------------
@@ -619,13 +645,13 @@ bool Setup()
 	// create balls and set the position
 	for (i=0;i<10;i++) {
 		if (false == g_sphere[i].create(Device, sphereColor[i])) return false;
-		g_sphere[i].setCenter(spherePos[i][0], (float)M_RADIUS , spherePos[i][1]);
+		g_sphere[i].setCenter(spherePos[i][0], (float)g_sphere[i].getRadius(), spherePos[i][1]);
 		g_sphere[i].setPower(0,0);
 	}
 
 	// create blue ball for set direction
     if (false == g_target_blueball.create(Device, d3d::BLUE)) return false; // 수정) 이 공이 마우스 좌클릭으로 움직이는 공임. 원하는 색깔 변경 가능.(기존 파란색)
-	g_target_blueball.setCenter(-0.0f, (float)M_RADIUS , -4.2f); // 움직이는 공의 초기 좌표 설정. 첫번째게 x축, 세번째게 z축 위치
+	g_target_blueball.setCenter(-0.0f, (float)g_target_blueball.getRadius(), -4.2f); // 움직이는 공의 초기 좌표 설정. 첫번째게 x축, 세번째게 z축 위치
 
 	g_sphere[0].set_whiteball(true); // 충돌에도 안 없어지게 하기 위한 설정
 	g_target_blueball.set_whiteball(true); // 충돌에도 안 없어지게 하기 위한 설정
