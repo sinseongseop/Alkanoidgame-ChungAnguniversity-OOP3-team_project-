@@ -35,7 +35,7 @@ const int Height = 768;
 // initialize the position (coordinate) of each ball (ball0 ~ ball3)
 const float spherePos[10][2] = { {0.5f,-2.0f} , {+2.4f,0} , {1.2f,1} , {-2.0f,-1.5f},{-1.4f,2.2f} ,{2.4f,3.2f} ,{-1.3f,1.2f} ,{1.6f,1.3f} ,{-1.2f,-2.1f} ,{-1.0f,2.1f} };
 // initialize the color of each ball (ball0 ~ ball3)
-const D3DXCOLOR sphereColor[10] = {d3d::WHITE, d3d::RED, d3d::RED, d3d::RED,d3d::RED ,d3d::RED ,d3d::RED ,d3d::RED ,d3d::RED ,d3d::RED };
+const D3DXCOLOR sphereColor[10] = {d3d::WHITE, d3d::RED, d3d::RED, d3d::RED,d3d::RED ,d3d::RED ,d3d::RED ,d3d::RED ,d3d::BLACK ,d3d::BLACK };
 
 // -----------------------------------------------------------------------------
 // Transform matrices
@@ -48,7 +48,7 @@ D3DXMATRIX g_mProj;
 #define PI 3.14159265
 #define M_HEIGHT 0.1
 #define DECREASE_RATE 1 //공의 감속 관련
-
+#define ITEM_TIME 1000 // 아이템 지속 시간 
 
 // -----------------------------------------------------------------------------
 // CSphere class definition
@@ -63,6 +63,7 @@ private :
 	float					m_velocity_z;
 	bool					sphere_exist = true; // 공이 실제로 존재하는 지. 충돌시 False로 변경
 	bool					white_ball = false; //발사되는 공 or 움직이는 공 인가? (충돌 시에도 계속 존재해야함)
+	bool					has_item = false; // 이 공을 깨면 아이템이 나오는 가?
 
 public:
     CSphere(void)
@@ -77,6 +78,14 @@ public:
     ~CSphere(void) {}
 
 public:
+	void set_item(bool has_item) {
+		this->has_item = has_item;
+		}
+	
+	inline bool is_has_item() {
+		return has_item;
+	}
+
 	int get_nochangetime() { // no_change_time 얻기
 		return no_change_time;
 	}
@@ -199,39 +208,39 @@ public:
 			float speedup3 = 0;
 			float speedup4 = 0;
 
-			if (abs(-ball.getVelocity_X() + random_number1) < 1.5) { // 너무 느려지는 거 방지용 속도 보정
+			if (abs(-ball.getVelocity_X() + random_number1) < 2) { // 너무 느려지는 거 방지용 속도 보정
 				if (-ball.getVelocity_X() + random_number1 >= 0) {
-					speedup1 = 1.5;
+					speedup1 = 2;
 				}
 				else {
-					speedup1 = -1.5;
+					speedup1 = -2;
 				}
 			}
 
-			if (abs(-ball.getVelocity_Z() + random_number2) < 1.5) {
+			if (abs(-ball.getVelocity_Z() + random_number2) < 2) {
 				if (-ball.getVelocity_Z() + random_number2 >= 0) {
-					speedup2 = 1.5;
+					speedup2 = 2;
 				}
 				else {
-					speedup2 = -1.5;
+					speedup2 = -2;
 				}
 			}
 
-			if (abs(getVelocity_X() + random_number1) < 1.5) {
+			if (abs(getVelocity_X() + random_number1) < 2) {
 				if (getVelocity_X() + random_number1 >= 0) {
-					speedup3 = 1.5;
+					speedup3 = 2;
 				}
 				else {
-					speedup3 = -1.5;
+					speedup3 = -2;
 				}
 			}
 
-			if (abs(getVelocity_Z() + random_number2) < 1.5) {
+			if (abs(getVelocity_Z() + random_number2) < 2) {
 				if (getVelocity_Z() + random_number2 >= 0) {
-					speedup4 = 1.5;
+					speedup4 = 2;
 				}
 				else {
-					speedup4 = -1.5;
+					speedup4 = -2;
 				}
 			}
 
@@ -239,7 +248,7 @@ public:
 				ball.set_exist(false); // 공을 화면에서 없앤다.
 			}
 			else {
-				ball.setPower(-ball.getVelocity_X()+random_number1+speedup1,0 -ball.getVelocity_Z()+random_number2+speedup2); // 안 없어지는 공이라면 속도를 업데이트 한다.
+				ball.setPower(-ball.getVelocity_X()+random_number1+speedup1, -ball.getVelocity_Z()+random_number2+speedup2); // 안 없어지는 공이라면 속도를 업데이트 한다.
 			}
 			if (!this->get_whiteball()) {
 				this->set_exist(false); // 공을 화면에서 없앤다.
@@ -291,21 +300,21 @@ public:
 
 	void setPower(double vx, double vz)
 	{
-		if (vx > 3.5) { // 최대 속도 제한
-			this->m_velocity_x = 3.5;
+		if (vx > 4) { // 최대 속도 제한
+			this->m_velocity_x = 4;
 		}
-		else if (vx < -3.5) {
-			this->m_velocity_x = -3.5;
+		else if (vx < -4) {
+			this->m_velocity_x = -4;
 		}
 		else {
 			this->m_velocity_x = vx;
 		}
 
-		if (vz > 3.5) { // 최대 속도 제한
-			this->m_velocity_z = 3.5;
+		if (vz > 4) { // 최대 속도 제한
+			this->m_velocity_z = 4;
 		}
-		else if (vz < -3) {
-			this->m_velocity_z = -3.5;
+		else if (vz < -4) {
+			this->m_velocity_z = -4;
 		}
 		else {
 			this->m_velocity_z = vz;
@@ -437,7 +446,7 @@ public:
 				break;
 
 			case 3: // 움직이는 판
-				if (m_z + m_depth /2 + 0.001 >= ball.get_centerz() - ball.getRadius() && (ball.get_centerx() + ball.getRadius()> m_x - m_width/2 -0.001 && ball.get_centerx() - ball.getRadius()< m_x +m_width/2 +0.001) ) {
+				if ((m_z - m_depth / 2  <= ball.get_centerz() && m_z + m_depth /2 + 0.001 >= ball.get_centerz() - ball.getRadius() )&& (ball.get_centerx() + ball.getRadius()> m_x - m_width/2 -0.001 && ball.get_centerx() - ball.getRadius()< m_x +m_width/2 +0.001) ) {
 					return true;
 				}
 				break;
@@ -456,21 +465,21 @@ public:
 		if (hasIntersected(ball)){
 			ball.set_nochangetime(5); // 5번 돌때 동안은 변화 무시
 			float speedup = 0;
-			if (abs(ball.getVelocity_X()) <= 1.5) { // 공이 너무 느려짐을 방지
+			if (abs(ball.getVelocity_X()) <= 2) { // 공이 너무 느려짐을 방지
 				if (ball.getVelocity_X() > 0) {
-					float speedup = 1.5;
+					float speedup = 2;
 				}
 				else {
-					float speedup = -1.5;
+					float speedup = -2;
 				}
 				ball.setPower(ball.getVelocity_X()+speedup, ball.getVelocity_Z());
 			}
-			if (abs(ball.getVelocity_Z()) <= 1.5) {
+			if (abs(ball.getVelocity_Z()) <= 2) {
 				if (ball.getVelocity_Z() > 0) {
-					float speedup = 1.5;
+					float speedup = 2;
 				}
 				else {
-					float speedup = -1.5;
+					float speedup = -2;
 				}
 				ball.setPower(ball.getVelocity_X(), ball.getVelocity_Z()+speedup);
 			
@@ -493,21 +502,21 @@ public:
 				ball.setPower(-(ball.getVelocity_X()+0.002), ball.getVelocity_Z());
 				break;
 			case 3: // 움직이는 판
-				if (abs(ball.getVelocity_X() + random_number2) <= 1.5 ) {
+				if (abs(ball.getVelocity_X() + random_number2) <= 2 ) {
 					if (ball.getVelocity_X() + random_number2 >= 0) {
-						random_number2 += 0.5;
+						random_number2 += 1;
 					}
 					else {
-						random_number2 -= 0.5;
+						random_number2 -= 1;
 					}
 				}
 
-				if (abs(ball.getVelocity_Z() + random_number1 <= 1.5)) {
+				if (abs(ball.getVelocity_Z() + random_number1 <= 2)) {
 					if (ball.getVelocity_Z() + random_number1 >= 0) {
-						random_number1 += 0.5;
+						random_number1 += 1;
 					}
 					else {
-						random_number1 -= 0.5;
+						random_number1 -= 1;
 					}
 				
 				}
@@ -539,7 +548,9 @@ public:
 		return org;
 	}
 
-
+	float get_x() { // 벽의 x축 좌표를 얻음
+		return m_x;
+	}
 	
 private :
     void setLocalTransform(const D3DXMATRIX& mLocal) { m_mLocal = mLocal; }
@@ -635,7 +646,6 @@ private:
     d3d::BoundingSphere m_bound;
 };
 
-
 // -----------------------------------------------------------------------------
 // Global variables
 // -----------------------------------------------------------------------------
@@ -646,6 +656,110 @@ CSphere	g_target_blueball;
 CLight	g_light;
 CWall move_board; // 움직이는 판
 
+//아이템 클래스
+class Item // I는 대문자 i 임(item)
+{
+public:
+	inline int choose_random_item() { //4가지 아이템중 랜덤으로 얻을 아이템을 정하는 함수
+		return 1; // 디버깅 용 코드. 원하는 아이템 번호 삽입
+		std::uniform_int_distribution<int> distribution(1, 4); // 4가지 아이템이 존재
+		int random_number = distribution(gen);
+		return random_number; // 정해진 랜덤 숫자(정수) 반환
+	}
+
+	void longer_board() { // 일정시간 동안 움직이는 판의 길이를 증가시킨다.
+		set_is_use_item1(true);
+		item_time[0] += ITEM_TIME;
+		float position_x = move_board.get_x(); // 기존 움직이는 판의 x 좌표를 얻는다.
+		move_board.destroy();
+		move_board.create(Device, -1, -1, 2, 0.4f, 0.15f, d3d::CYAN);
+		move_board.setPosition(position_x, 0.12f, -4.2f);
+	}
+
+	void original_board() { //일정시간 후 움직이는 판의 길이를 원래대로 돌린다.
+		set_is_use_item1(false);
+		float position_x = move_board.get_x(); // 기존 움직이는 판의 x 좌표를 얻는다.
+		move_board.destroy();
+		move_board.create(Device, -1, -1, 1, 0.4f, 0.15f, d3d::CYAN);
+		move_board.setPosition(position_x, 0.12f, -4.2f);
+	}
+
+	void plus_whiteball() { // 추가 공을 생성한다.
+		
+	}
+
+	void plus_life() { // 생명을 1 추가 한다.
+	
+	}
+
+	void ignore_collision(){ //일정 시간동안 공이 직선으로 날아가게 한다.
+		set_is_use_item4(true);
+		item_time[3] += ITEM_TIME;
+
+
+
+	}
+
+	void original_collsision() { // 공의 충돌 판정을 원래 상태로 돌린다.
+		set_is_use_item4(false);
+
+
+
+	}
+
+	void use_item() { // 아이템 사용 함수
+		int item_num = choose_random_item(); // 랜덤 아이템 1개를 얻는다.
+		switch (item_num)
+		{
+		case 1:
+			longer_board(); // 움직이는 판의 길이를 증가시킨다.
+			break;
+		case 2:
+			plus_whiteball(); // 추가 공을 생성한다.
+			break;
+		case 3: 
+			plus_life(); //목숨 하나 추가
+			break;
+		case 4:
+			ignore_collision(); // 공끼리의 충돌을 무시하고 직선으로 날아간다.
+			break;
+		default:
+			break;
+		}
+	}
+
+	inline void set_item_time(int time, int item_num) { // item_num의 남은 지속시간을 time으로 설정한다.
+		item_time[item_num] = time;
+	}
+	
+	inline int get_item_time(int item_num) { //item_num의 남은 지속시간을 얻는다.
+		return item_time[item_num];
+	}
+
+	inline bool get_is_use_item1() {
+		return is_use_item1;
+	}
+
+	inline bool get_is_use_item4() {
+		return is_use_item4;
+	}
+
+	inline void set_is_use_item1(bool use) {
+		is_use_item1 = use;
+	}
+
+	inline void set_is_use_item4(bool use) {
+		is_use_item4 = use;
+	}
+
+private:
+	int item_time[4] = { 0,0,0,0 }; // 아이템 번호별 남은 유지 시간( item1,item4한테만 유의미, 규칙성 때문에 4로 설정)
+	bool is_use_item1 = false;
+	bool is_use_item4 = false;
+};
+
+
+Item special_item;// 아이템 객체 
 
 double g_camera_pos[3] = {0.0, 0.0, -0.0};
 
@@ -697,6 +811,9 @@ bool Setup()
 		g_sphere[i].setPower(0,0);
 	}
 
+	g_sphere[8].set_item(true);
+	g_sphere[9].set_item(true);
+
 	// create blue ball for set direction
     //if (false == g_target_blueball.create(Device, d3d::BLUE)) return false; // 수정) 이 공이 마우스 좌클릭으로 움직이는 공임. 원하는 색깔 변경 가능.(기존 파란색)
 	//g_target_blueball.setCenter(-0.0f, (float)g_target_blueball.getRadius(), -4.2f); // 움직이는 공의 초기 좌표 설정. 첫번째게 x축, 세번째게 z축 위치
@@ -744,7 +861,7 @@ bool Setup()
 void Cleanup(void)
 {
     g_legoPlane.destroy();
-	for(int i = 0 ; i < 4; i++) {
+	for(int i = 0 ; i < 3; i++) {
 		g_legowall[i].destroy();
 	}
     destroyAllLegoBlock();
@@ -779,14 +896,35 @@ bool Display(float timeDelta)
 			if (g_sphere[i].get_exist()) { // i 공이  실재로 존재하면 i공과 움직이는 공의 충돌 확인
 				g_sphere[0].hitBy(g_sphere[i]);
 				}
+			else { // 공이 존재하지 않으면 이 공이 아이템을 가지고 있는 지 확인한다.
+				if (g_sphere[i].is_has_item()) {
+					special_item.use_item();
+					g_sphere[i].set_item(false); // 아이템을 먹었으므로 공의 item을 false 처리 해준다.
+				}
+			
 			}
+			}
+
+		if (special_item.get_item_time(0) > 0) { // 아이템 1 지속시간 업데이트
+			special_item.set_item_time((special_item.get_item_time(0) - 1),0);	
+		}
+		else if (special_item.get_is_use_item1()) {
+			special_item.original_board(); // 아이템 1의 지속시간이 끝나면 판을 원래 길이로 되돌린다.
+		}
+
+		if (special_item.get_item_time(3) > 0) {  // 아이템 4 지속시간 업데이트
+			special_item.set_item_time((special_item.get_item_time(3) - 1), 3);
+		}
+		else if (special_item.get_is_use_item4()) {
+			special_item.original_collsision(); // 아이템 4의 지속시간이 끝나면 공을 원래 상태로 되돌린다.
+		}
 
 		//g_target_blueball.hitBy(g_sphere[0]); // 파란공과 흰공 충돌 확인
 
-		if (g_sphere[0].is_balloutside()) {
+		if (g_sphere[0].is_balloutside()) { //움직이는 공이 규격장 밖으로 나가면 공의 초기화 시킴.
 			g_sphere[0].destroy();
 			if (false == g_sphere[0].create(Device, sphereColor[0])) return false;
-			g_sphere[0].setCenter(spherePos[0][0], (float)M_RADIUS, spherePos[0][1]);
+			g_sphere[0].setCenter(spherePos[0][0], (float)g_sphere[0].getRadius(), spherePos[0][1]);
 			g_sphere[0].setPower(0, 0);
 		}
 		
