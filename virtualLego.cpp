@@ -48,7 +48,8 @@ D3DXMATRIX g_mProj;
 #define PI 3.14159265
 #define M_HEIGHT 0.1
 #define DECREASE_RATE 1 //공의 감속 관련
-#define ITEM_TIME 1000 // 아이템 지속 시간 
+#define ITEM_TIME1 2000 // 아이템1 지속 시간 
+#define ITEM_TIME4 1000 // 아이템4 지속 시간
 
 // -----------------------------------------------------------------------------
 // CSphere class definition
@@ -64,6 +65,8 @@ private :
 	bool					sphere_exist = true; // 공이 실제로 존재하는 지. 충돌시 False로 변경
 	bool					white_ball = false; //발사되는 공 or 움직이는 공 인가? (충돌 시에도 계속 존재해야함)
 	bool					has_item = false; // 이 공을 깨면 아이템이 나오는 가?
+	bool					ignore_collision = false;// 공끼리 충돌 할때 공의 진행 방향이 바뀌는가?
+
 
 public:
     CSphere(void)
@@ -78,6 +81,14 @@ public:
     ~CSphere(void) {}
 
 public:
+	void set_ignore_collision(bool ignore) {
+		ignore_collision = ignore;
+	}
+
+	inline bool get_ignore_collision() {
+		return ignore_collision;
+	}
+
 	void set_item(bool has_item) {
 		this->has_item = has_item;
 		}
@@ -195,7 +206,7 @@ public:
 	{ 
 		
 		if (hasIntersected(ball)) { // 충돌이 발생 할때
-			ball.set_nochangetime(5); // 5번 돌때 동안은 변화 무시
+			ball.set_nochangetime(2); // 2번 돌때 동안은 변화 무시
 
 			
 			// 원하는 분포와 범위로 랜덤 실수 생성
@@ -248,13 +259,20 @@ public:
 				ball.set_exist(false); // 공을 화면에서 없앤다.
 			}
 			else {
-				ball.setPower(-ball.getVelocity_X()+random_number1+speedup1, -ball.getVelocity_Z()+random_number2+speedup2); // 안 없어지는 공이라면 속도를 업데이트 한다.
+				if (! ball.ignore_collision) {
+					ball.setPower(-ball.getVelocity_X() + random_number1 + speedup1, -ball.getVelocity_Z() + random_number2 + speedup2); // 안 없어지는 공이고 충돌 영향받는 상태면 속도를 업데이트 한다.
+	
+				}
+
 			}
 			if (!this->get_whiteball()) {
 				this->set_exist(false); // 공을 화면에서 없앤다.
 			}
 			else {
-				this->setPower(-getVelocity_X() + random_number1+speedup3, -getVelocity_Z() + random_number2+speedup4);  // 안 없어지는 공이라면 속도를 업데이트 한다.
+				if (!ball.ignore_collision) {
+					this->setPower(-getVelocity_X() + random_number1 + speedup3, -getVelocity_Z() + random_number2 + speedup4);  // 안 없어지는 공이고 충돌 영향받는 상태면  속도를 업데이트 한다.
+				}
+
 			}
 
 		}
@@ -660,8 +678,8 @@ CWall move_board; // 움직이는 판
 class Item // I는 대문자 i 임(item)
 {
 public:
-	inline int choose_random_item() { //4가지 아이템중 랜덤으로 얻을 아이템을 정하는 함수
-		return 1; // 디버깅 용 코드. 원하는 아이템 번호 삽입
+	int choose_random_item() { //4가지 아이템중 랜덤으로 얻을 아이템을 정하는 함수
+		//return 4; // 디버깅 용 코드. 원하는 아이템 번호 삽입
 		std::uniform_int_distribution<int> distribution(1, 4); // 4가지 아이템이 존재
 		int random_number = distribution(gen);
 		return random_number; // 정해진 랜덤 숫자(정수) 반환
@@ -669,7 +687,7 @@ public:
 
 	void longer_board() { // 일정시간 동안 움직이는 판의 길이를 증가시킨다.
 		set_is_use_item1(true);
-		item_time[0] += ITEM_TIME;
+		item_time[0] += ITEM_TIME1;
 		float position_x = move_board.get_x(); // 기존 움직이는 판의 x 좌표를 얻는다.
 		move_board.destroy();
 		move_board.create(Device, -1, -1, 2, 0.4f, 0.15f, d3d::CYAN);
@@ -694,17 +712,17 @@ public:
 
 	void ignore_collision(){ //일정 시간동안 공이 직선으로 날아가게 한다.
 		set_is_use_item4(true);
-		item_time[3] += ITEM_TIME;
-
-
-
+		item_time[3] += ITEM_TIME4;
+		for (int i = 0; i < 10; i++) {
+			g_sphere[i].set_ignore_collision(true); // 충돌 무시 속성을 true로 다 바꿔준다
+		}
 	}
 
 	void original_collsision() { // 공의 충돌 판정을 원래 상태로 돌린다.
 		set_is_use_item4(false);
-
-
-
+		for (int i = 0; i < 10; i++) {
+			g_sphere[i].set_ignore_collision(false);// 충돌 무시 속성을 false로 다 바꿔준다
+		}
 	}
 
 	void use_item() { // 아이템 사용 함수
@@ -810,6 +828,11 @@ bool Setup()
 		g_sphere[i].setCenter(spherePos[i][0], (float)g_sphere[i].getRadius(), spherePos[i][1]);
 		g_sphere[i].setPower(0,0);
 	}
+
+	/*for (int i = 1; i<10; i++) { // 디버깅 확인용
+		g_sphere[i].set_item(true);
+	}
+	*/
 
 	g_sphere[8].set_item(true);
 	g_sphere[9].set_item(true);
