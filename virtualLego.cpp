@@ -20,6 +20,10 @@
 #include <cmath>
 #include <random>
 
+//랜덤 변수 초기 설정
+std::random_device rd;
+std::mt19937 gen(rd());
+
 
 IDirect3DDevice9* Device = NULL;
 
@@ -43,7 +47,7 @@ D3DXMATRIX g_mProj;
 #define M_RADIUS 0.21   // ball radius
 #define PI 3.14159265
 #define M_HEIGHT 0.1
-#define DECREASE_RATE 0.999999 //공의 감속 관련
+#define DECREASE_RATE 1 //공의 감속 관련
 
 
 // -----------------------------------------------------------------------------
@@ -183,8 +187,7 @@ public:
 		
 		if (hasIntersected(ball)) { // 충돌이 발생 할때
 			ball.set_nochangetime(5); // 5번 돌때 동안은 변화 무시
-			std::random_device rd;
-			std::mt19937 gen(rd());
+
 			
 			// 원하는 분포와 범위로 랜덤 실수 생성
 			std::uniform_real_distribution<double> distribution(-1.0, 1.0);
@@ -376,6 +379,7 @@ public:
 		
         m_width = iwidth;
         m_depth = idepth;
+		m_height = iheight;
 		
         if (FAILED(D3DXCreateBox(pDevice, iwidth, iheight, idepth, &m_pBoundMesh, NULL)))
             return false;
@@ -384,6 +388,10 @@ public:
 
 	inline void setwallnum(int wall_num) {
 		this->wall_num = wall_num;
+	}
+
+	inline float get_witdh() { // 벽의 가로 길이 얻기
+		return this->m_width;
 	}
 
     void destroy(void)
@@ -427,6 +435,13 @@ public:
 					return true;
 				}
 				break;
+
+			case 3: // 움직이는 판
+				if (m_z + m_depth /2 + 0.001 >= ball.get_centerz() - ball.getRadius() && (ball.get_centerx() + ball.getRadius()> m_x - m_width/2 -0.001 && ball.get_centerx() - ball.getRadius()< m_x +m_width/2 +0.001) ) {
+					return true;
+				}
+				break;
+
 			default:
 				break;
 		
@@ -460,6 +475,10 @@ public:
 				ball.setPower(ball.getVelocity_X(), ball.getVelocity_Z()+speedup);
 			
 			}
+			std::uniform_real_distribution<double> distribution(-1.0, 1.0);
+			std::uniform_real_distribution<double> a(-0.5, 0.5);
+			double random_number1 = distribution(gen);
+			double random_number2 = a(gen);
 
 
 			switch (this->wall_num)
@@ -472,6 +491,27 @@ public:
 				break;
 			case 2: // 오른쪽 벽
 				ball.setPower(-(ball.getVelocity_X()+0.002), ball.getVelocity_Z());
+				break;
+			case 3: // 움직이는 판
+				if (abs(ball.getVelocity_X() + random_number2) <= 1.5 ) {
+					if (ball.getVelocity_X() + random_number2 >= 0) {
+						random_number2 += 0.5;
+					}
+					else {
+						random_number2 -= 0.5;
+					}
+				}
+
+				if (abs(ball.getVelocity_Z() + random_number1 <= 1.5)) {
+					if (ball.getVelocity_Z() + random_number1 >= 0) {
+						random_number1 += 0.5;
+					}
+					else {
+						random_number1 -= 0.5;
+					}
+				
+				}
+				ball.setPower(ball.getVelocity_X()+random_number2, -(ball.getVelocity_Z() +random_number1));
 				break;
 			default:
 				break;
@@ -493,7 +533,13 @@ public:
 	
     float getHeight(void) const { return M_HEIGHT; }
 	
-	
+	D3DXVECTOR3 getCenter(void) const
+	{
+		D3DXVECTOR3 org(m_x,M_RADIUS, m_z);
+		return org;
+	}
+
+
 	
 private :
     void setLocalTransform(const D3DXMATRIX& mLocal) { m_mLocal = mLocal; }
@@ -598,7 +644,7 @@ CWall	g_legowall[4];
 CSphere	g_sphere[10];
 CSphere	g_target_blueball;
 CLight	g_light;
-
+CWall move_board; // 움직이는 판
 
 
 double g_camera_pos[3] = {0.0, 0.0, -0.0};
@@ -634,13 +680,15 @@ bool Setup()
 
 	if (false == g_legowall[2].create(Device, -1, -1, 0.3f, 0.3f, 9.0f, d3d::BLACK)) return false; // 오른쪽 벽
 	g_legowall[2].setPosition(3.1f, 0.12f, 0.0f);
-	//if (false == g_legowall[3].create(Device, -1, -1, 9, 0.3f, 0.12f, d3d::BLACK)) return false;  //	불필요한 벽
-	//g_legowall[3].setPosition(0.0f, 0.12f, -3.06f);
+
+	if (false == move_board.create(Device, -1, -1, 1, 0.4f, 0.15f, d3d::CYAN)) return false;  //	움직이는 판
+	move_board.setPosition(0.0f, 0.12f, -4.2f);
 
 	for (int i = 0; i < 3; i++) {
 		g_legowall[i].setwallnum(i);
 	}
 
+	move_board.setwallnum(3); // 움직이는 보드 번호(3) 설정
 
 	// create balls and set the position
 	for (i=0;i<10;i++) {
@@ -650,11 +698,11 @@ bool Setup()
 	}
 
 	// create blue ball for set direction
-    if (false == g_target_blueball.create(Device, d3d::BLUE)) return false; // 수정) 이 공이 마우스 좌클릭으로 움직이는 공임. 원하는 색깔 변경 가능.(기존 파란색)
-	g_target_blueball.setCenter(-0.0f, (float)g_target_blueball.getRadius(), -4.2f); // 움직이는 공의 초기 좌표 설정. 첫번째게 x축, 세번째게 z축 위치
+    //if (false == g_target_blueball.create(Device, d3d::BLUE)) return false; // 수정) 이 공이 마우스 좌클릭으로 움직이는 공임. 원하는 색깔 변경 가능.(기존 파란색)
+	//g_target_blueball.setCenter(-0.0f, (float)g_target_blueball.getRadius(), -4.2f); // 움직이는 공의 초기 좌표 설정. 첫번째게 x축, 세번째게 z축 위치
 
 	g_sphere[0].set_whiteball(true); // 충돌에도 안 없어지게 하기 위한 설정
-	g_target_blueball.set_whiteball(true); // 충돌에도 안 없어지게 하기 위한 설정
+	//g_target_blueball.set_whiteball(true); // 충돌에도 안 없어지게 하기 위한 설정
 
 
 	// light setting 
@@ -721,6 +769,7 @@ bool Display(float timeDelta)
 			for (j = 0; j < 3; j++) {
 				g_legowall[j].hitBy(g_sphere[i]);
 			 }
+			move_board.hitBy(g_sphere[i]);
 			g_sphere[i].ballUpdate(timeDelta);
 		}
 
@@ -732,7 +781,7 @@ bool Display(float timeDelta)
 				}
 			}
 
-		g_target_blueball.hitBy(g_sphere[0]); // 파란공과 흰공 충돌 확인
+		//g_target_blueball.hitBy(g_sphere[0]); // 파란공과 흰공 충돌 확인
 
 		if (g_sphere[0].is_balloutside()) {
 			g_sphere[0].destroy();
@@ -748,13 +797,16 @@ bool Display(float timeDelta)
 		for (i=0;i<3;i++) 	{
 			g_legowall[i].draw(Device, g_mWorld);
 		}
+
+		move_board.draw(Device, g_mWorld);
+
 		for (i = 0; i < 10; i++) {
 			if (g_sphere[i].get_exist()) {
 				g_sphere[i].draw(Device, g_mWorld);
 			}
 
 		}
-		g_target_blueball.draw(Device, g_mWorld);
+		//g_target_blueball.draw(Device, g_mWorld);
        // g_light.draw(Device); // 빛 위치 끄기
 		
 		Device->EndScene();
@@ -793,7 +845,7 @@ LRESULT CALLBACK d3d::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 break;
             case VK_SPACE:
 				
-				D3DXVECTOR3 targetpos = g_target_blueball.getCenter(); // 이부분을 수정하면 공의 목적지가 변형 됩니다.
+				D3DXVECTOR3 targetpos = move_board.getCenter(); // 이부분을 수정하면 공의 목적지가 변형 됩니다.
 				D3DXVECTOR3	whitepos = g_sphere[0].getCenter(); // 이부분을 수정하면 발사되는 공이 수정 됩니다.
 				double theta = acos(sqrt(pow(targetpos.x - whitepos.x, 2)) / sqrt(pow(targetpos.x - whitepos.x, 2) +
 					pow(targetpos.z - whitepos.z, 2)));		// 기본 1 사분면
@@ -844,20 +896,23 @@ LRESULT CALLBACK d3d::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             } else {
                 isReset = true;
 				
-				if (LOWORD(wParam) & MK_RBUTTON) { // 이부분을 수정하여 파란색 공이 오직 좌우 방향으로만 움직이게 만들기 가능.
+				if (LOWORD(wParam) & MK_RBUTTON) { // 이부분을 수정하여 움직이는 판 이 오직 좌우 방향으로만 움직이게 만들기 가능.
 					dx = (old_x - new_x);// * 0.01f;
 					dy = 0; // 0.01f;  // y방향으로는 움직게 하는 것 불가능. 
 		
-					D3DXVECTOR3 coord3d=g_target_blueball.getCenter();
-					if (-2.8 <= coord3d.x + dx * (-0.007f) && coord3d.x + dx * (-0.007f)<=2.8) {
-						g_target_blueball.setCenter(coord3d.x + dx * (-0.007f), coord3d.y, coord3d.z + dy * 0.007f);
+					D3DXVECTOR3 coord3d=move_board.getCenter();
+					if (-3.0 + move_board.get_witdh() / 2 +0.1 <= coord3d.x + dx * (-0.007f) && coord3d.x + dx * (-0.007f)<= 3.0 - move_board.get_witdh() / 2 - 0.1 ) {
+						//g_target_blueball.setCenter(coord3d.x + dx * (-0.007f), coord3d.y, coord3d.z + dy * 0.007f);
+						move_board.setPosition(coord3d.x + dx * (-0.007f), coord3d.y, coord3d.z + dy * 0.007f);
 					}
-					else { //파란색 공이 움직일 수 있는 x축 범위를 제한
-						if (coord3d.x + dx * (-0.007f) < -2.8) {
-							g_target_blueball.setCenter(-2.8, coord3d.y, coord3d.z + dy * 0.007f);
+					else { //움직이는 판 이 움직일 수 있는 x축 범위를 제한
+						if (coord3d.x + dx * (-0.007f) < -3.0+move_board.get_witdh()/2 +0.1) {
+							//g_target_blueball.setCenter(-2.8, coord3d.y, coord3d.z + dy * 0.007f);
+							move_board.setPosition(-3.0 + move_board.get_witdh() / 2 +0.1, coord3d.y, coord3d.z + dy * 0.007f);
 						}
 						else {
-							g_target_blueball.setCenter(2.8, coord3d.y, coord3d.z + dy * 0.007f);
+							//g_target_blueball.setCenter(2.8, coord3d.y, coord3d.z + dy * 0.007f);
+							move_board.setPosition(3.0 - move_board.get_witdh() / 2 - 0.1 , coord3d.y, coord3d.z + dy * 0.007f);
 						}
 						
 					}
