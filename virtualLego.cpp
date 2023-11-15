@@ -30,7 +30,7 @@ const int Height = 768;
 
 // There are four balls
 // initialize the position (coordinate) of each ball (ball0 ~ ball3)
-const float startpos_y = 3.0f;
+const float startpos_y = 4.19f;
 float spherePos[10][2] = { {0.0f,startpos_y} , {+2.0f,startpos_y} , {2.5f,startpos_y} , {-2.0f,startpos_y},{-1.0f,startpos_y} ,{2.4f,startpos_y} ,{-1.3f,startpos_y} ,{1.6f,startpos_y} ,{-1.2f,startpos_y} ,{-1.0f,startpos_y} };
 // initialize the color of each ball (ball0 ~ ball3)
 const D3DXCOLOR sphereColor[10] = { d3d::RED, d3d::RED, d3d::RED, d3d::RED,d3d::RED ,d3d::RED ,d3d::RED ,d3d::RED ,d3d::RED ,d3d::RED };
@@ -126,6 +126,11 @@ public:
 			center_z = white_ball_pos[1];
 
 		}
+	}
+
+	void set_ball_down() {
+		setCenter(center_x, center_y, center_z - m_radius);
+		//center_z-m_radius의 값이 바닥보다 작아진다면
 	}
 
 
@@ -350,6 +355,7 @@ public:
 	void setMonsters(float pos[2], CSphere monster) {
 		monster.setCenter(pos[0], (float)monster.getRadius(), pos[1]);
 		monster.setPower(0, 0);
+		monster.set_ball_down();
 		monsters.push_back(monster);
 	}
 
@@ -757,6 +763,8 @@ bool Display(float timeDelta)
 {
 	int i = 0;
 	int j = 0;
+	std::random_device rd;
+	std::mt19937 gen(rd());
 
 	if (Device)
 	{
@@ -764,28 +772,39 @@ bool Display(float timeDelta)
 		Device->BeginScene();
 
 		//if duration>1s, set a new balls
-		//if (monsterGenerator.getduration() > 1) {
-		//	for (i = 0; i < 10; i++) {
-		//		CSphere sphere;
-		//		if (false == sphere.create(Device, sphereColor[i])) return false;
-		//		monsterGenerator.setMonsters(spherePos[i], sphere);
-		//	}
-		//	and set existin
-		//}
+		if (monsterGenerator.getduration() > 1) {
+			//existing balls down.
+			for (i = 0; i < monsterGenerator.getCountMonsters(); i++) {
+				monsterGenerator.getMonster(i).set_ball_down();
+			}
+			//set a new balls
+			for (i = 0; i < 10; i++) {
+				CSphere sphere;
+				// 원하는 분포와 범위로 랜덤 실수 생성
+				std::uniform_real_distribution<double> distribution(-3.1, 3.1);
+				double random_y;
+
+				if (false == sphere.create(Device, sphereColor[i])) return false;
+				monsterGenerator.setMonsters(spherePos[i], sphere);
+			}
+
+		}
 
 		//player update
 		for (j = 0; j < 3; j++) {
 			g_legowall[j].hitBy(white_ball);
 		}
 		white_ball.ballUpdate(timeDelta);
+
+
 		// update the position of each ball. during update, check whether each ball hit by walls.
-		for (i = 0; i < monsterGenerator.getCountMonsters(); i++) {
-			CSphere monster = monsterGenerator.getMonster(i);
-			for (j = 0; j < 3; j++) {
-				g_legowall[j].hitBy(monster);
-			}
-			monster.ballUpdate(timeDelta);
-		}
+		//for (i = 0; i < monstergenerator.getcountmonsters(); i++) {
+		//	csphere monster = monstergenerator.getmonster(i);
+		//	for (j = 0; j < 3; j++) {
+		//		g_legowall[j].hitby(monster);
+		//	}
+		//	monster.ballupdate(timedelta);
+		//}
 
 
 		// check whether any two balls hit together and update the direction of balls
