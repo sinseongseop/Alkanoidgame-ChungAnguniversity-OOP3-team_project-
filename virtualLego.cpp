@@ -19,6 +19,7 @@
 #include <iostream>
 #include <cmath>
 #include <random>
+#include <time.h>
 
 
 IDirect3DDevice9* Device = NULL;
@@ -29,10 +30,11 @@ const int Height = 768;
 
 // There are four balls
 // initialize the position (coordinate) of each ball (ball0 ~ ball3)
-float spherePos[10][2] = { {0.5f,-1.0f} , {+2.4f,0} , {1.2f,1} , {-2.0f,-1.5f},{-1.4f,2.2f} ,{2.4f,3.2f} ,{-1.3f,1.2f} ,{1.6f,1.3f} ,{-1.2f,-2.1f} ,{-1.0f,2.1f} };
+const float startpos_y = 3.0f;
+float spherePos[10][2] = { {0.0f,startpos_y} , {+2.0f,startpos_y} , {2.5f,startpos_y} , {-2.0f,startpos_y},{-1.0f,startpos_y} ,{2.4f,startpos_y} ,{-1.3f,startpos_y} ,{1.6f,startpos_y} ,{-1.2f,startpos_y} ,{-1.0f,startpos_y} };
 // initialize the color of each ball (ball0 ~ ball3)
 const D3DXCOLOR sphereColor[10] = { d3d::RED, d3d::RED, d3d::RED, d3d::RED,d3d::RED ,d3d::RED ,d3d::RED ,d3d::RED ,d3d::RED ,d3d::RED };
-float white_ball_pos[2] = { 0.5f,-2.0f };
+float white_ball_pos[2] = { 0.5f,-3.0f };
 
 // -----------------------------------------------------------------------------
 // Transform matrices
@@ -120,8 +122,8 @@ public:
 	void ball_position() { // 공이 올바른 위치가 아니라면 위치를 변경하는 함수.
 		if (is_balloutside()) {
 			setPower(0, 0);
-			center_x = spherePos[0][0];
-			center_z = spherePos[0][1];
+			center_x = white_ball_pos[0];
+			center_z = white_ball_pos[1];
 
 		}
 	}
@@ -340,16 +342,15 @@ class MonsterGenerator
 {
 private:
 	std::vector<CSphere> monsters;
+	clock_t start_time;
+	double duration;
 
 public:
 	//make a monsters
-	void setMonsters(float pos[][2], CSphere monster) {
-		for (int i = 0; i < sizeof(pos); i++)
-		{
-			monster.setCenter(pos[i][0], (float)monster.getRadius(), pos[i][1]);
-			monster.setPower(0, 0);
-			monsters.push_back(monster);
-		}
+	void setMonsters(float pos[2], CSphere monster) {
+		monster.setCenter(pos[0], (float)monster.getRadius(), pos[1]);
+		monster.setPower(0, 0);
+		monsters.push_back(monster);
 	}
 
 	CSphere getMonster(int i) {
@@ -359,12 +360,17 @@ public:
 		monsters.erase(monsters.begin() + i);
 	}
 	void setMonsterExist(int i, bool exist) {
+		monsters[i].set_exist(exist);
 		if (!exist) {
 			deleteMonster(i);
 		}
 	}
 	int getCountMonsters() {
 		return monsters.size();
+	}
+	time_t getduration() {
+		duration = (double)(clock() - start_time) / CLOCKS_PER_SEC;
+		return duration;
 	}
 };
 
@@ -683,8 +689,12 @@ bool Setup()
 	for (i = 0; i < 10; i++) {
 		CSphere sphere;
 		if (false == sphere.create(Device, sphereColor[i])) return false;
-		monsterGenerator.setMonsters(spherePos, sphere);
+		monsterGenerator.setMonsters(spherePos[i], sphere);
 	}
+	/*CSphere sphere;
+	if (false == sphere.create(Device, sphereColor[i])) return false;*/
+	//float pos[1][2] = {{1.2f,3.0f}};
+	//monsterGenerator.setMonsters(pos, sphere);
 
 	// create blue ball for set direction
 	if (false == g_target_blueball.create(Device, d3d::BLUE)) return false; // 수정) 이 공이 마우스 좌클릭으로 움직이는 공임. 원하는 색깔 변경 가능.(기존 파란색)
@@ -753,13 +763,23 @@ bool Display(float timeDelta)
 		Device->Clear(0, 0, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0x00afafaf, 1.0f, 0);
 		Device->BeginScene();
 
-		//plater update
+		//if duration>1s, set a new balls
+		//if (monsterGenerator.getduration() > 1) {
+		//	for (i = 0; i < 10; i++) {
+		//		CSphere sphere;
+		//		if (false == sphere.create(Device, sphereColor[i])) return false;
+		//		monsterGenerator.setMonsters(spherePos[i], sphere);
+		//	}
+		//	and set existin
+		//}
+
+		//player update
 		for (j = 0; j < 3; j++) {
 			g_legowall[j].hitBy(white_ball);
 		}
 		white_ball.ballUpdate(timeDelta);
 		// update the position of each ball. during update, check whether each ball hit by walls.
-		for (i = 0; i < 10; i++) {
+		for (i = 0; i < monsterGenerator.getCountMonsters(); i++) {
 			CSphere monster = monsterGenerator.getMonster(i);
 			for (j = 0; j < 3; j++) {
 				g_legowall[j].hitBy(monster);
@@ -769,7 +789,7 @@ bool Display(float timeDelta)
 
 
 		// check whether any two balls hit together and update the direction of balls
-		for (i = 0; i < 10; i++) {
+		for (i = 0; i < monsterGenerator.getCountMonsters(); i++) {
 			CSphere monster = monsterGenerator.getMonster(i);
 			if (monster.get_exist()) { // i  실재로 존재하면 i공과 움직이는 공의 충돌 확인
 				white_ball.hitBy(monster);//
@@ -798,7 +818,7 @@ bool Display(float timeDelta)
 		if (white_ball.get_exist()) {
 			white_ball.draw(Device, g_mWorld);
 		}
-		for (i = 0; i < 10; i++) {
+		for (i = 0; i < monsterGenerator.getCountMonsters(); i++) {
 			CSphere monster = monsterGenerator.getMonster(i);
 			if (monster.get_exist()) {
 				monster.draw(Device, g_mWorld);
