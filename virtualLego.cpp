@@ -31,13 +31,26 @@ IDirect3DDevice9* Device = NULL;
 const int Width = 1500;
 const int Height = 768;
 
+// 벽의 가로, 세로, 두께 default 값
+const float Wall_height = 10.0f;
+const float Wall_width = 7.0f;
+const float Wall_thickness = 0.2f;
+
+//life의 position
+const float life_height = 5.5f;
+const float life_x = 3.5f;
+const float life_interval = 0.5f;
+
+
+
+
 // There are four balls
 // initialize the position (coordinate) of each ball (ball0 ~ ball3)
-const float spherePos[10][2] = { {0.5f,-2.0f} , {+2.4f,0} , {1.2f,1} , {-2.0f,-1.5f},{-1.4f,2.2f} ,{2.4f,3.2f} ,{-1.3f,1.2f} ,{1.6f,1.3f} ,{-1.2f,-2.1f} ,{-1.0f,2.1f} };
+const float spherePos[10][2] = { {1.5f,-2.0f} , {+2.4f,0} , {1.2f,1} , {-2.0f,-1.5f},{-1.4f,2.2f} ,{2.4f,3.2f} ,{-1.3f,1.2f} ,{1.6f,1.3f} ,{-1.2f,-2.1f} ,{-1.0f,2.1f} };
 // initialize the color of each ball (ball0 ~ ball3)
-const D3DXCOLOR sphereColor[10] = { d3d::WHITE, d3d::RED, d3d::RED, d3d::RED,d3d::RED ,d3d::RED ,d3d::RED ,d3d::RED ,d3d::BLACK ,d3d::BLACK };
+const D3DXCOLOR sphereColor[10] = { d3d::RED, d3d::RED, d3d::RED, d3d::RED,d3d::RED ,d3d::RED ,d3d::RED ,d3d::RED ,d3d::BLACK ,d3d::BLACK }; //블록
 
-const float extra_whitePos[4][2] = { {1.0f, -2.0f} , {-1.0f, -2.0f}, {0.7f, -1.5f}, {-0.7f, -1.5f}  };
+const float whitePos[5][2] = { {0.5f,-2.0f} ,{-1.0f, -1.5f} , {-1.0f, -2.0f}, {0.7f, -1.5f}, {-0.7f, -1.5f} }; // 흰공과 블록 분리
 
 // -----------------------------------------------------------------------------
 // Transform matrices
@@ -53,6 +66,19 @@ D3DXMATRIX g_mProj;
 #define ITEM_TIME1 2000 // 아이템1 지속 시간 
 #define ITEM_TIME4 1000 // 아이템4 지속 시간
 #define Max_Whiteball 5// 한 화면에 최대로 존재 가능한 흰공의 수 (1~5 까지 가능) //
+#define Max_life 5 // 가질 수 있는 생명의 최댓값(1~5까지 가능)
+
+void exitProgram();
+int lifeCnt = 4; //남은 목숨 개수 counting
+int ballCnt = 1; //공 개수 counting
+
+void minus_lifeCnt() {
+	lifeCnt--;
+	if (lifeCnt == 0) {
+		exitProgram();
+		return;
+	}
+}
 
 // -----------------------------------------------------------------------------
 // CSphere class definition
@@ -136,21 +162,27 @@ public:
 		return white_ball;
 	}
 
-	inline bool is_balloutside() { // 공의 정해진 장소 밖으로 나갔는 가?
-		if (center_x < -3.2 || center_x>3.2 || center_z > 4.8 || center_z < -4.8) {
+	inline bool is_balloutside(bool& bug) { // 공의 정해진 장소 밖으로 나갔는 가?
+		if (center_z < (-1) * Wall_height / 2 - 0.01) { //아래로 빠지는 경우
+			ballCnt--;
+			return true;
+		}
+
+		if (center_x < (-1) * Wall_width / 2 - 0.01 || center_x> Wall_width / 2 + 0.01 || center_z > Wall_height / 2 + 0.01) { //버그로 잘못된 위치에 가는 경우
+			bug = true; // 비정상적 공 탈출(버그)
 			return true;
 		}
 		return false;
 	}
 
-	void ball_position() { // 공이 올바른 위치가 아니라면 위치를 변경하는 함수.
+	/*void ball_position() { // 공이 올바른 위치가 아니라면 위치를 변경하는 함수.
 		if (is_balloutside()) {
 			setPower(0, 0);
 			center_x = spherePos[0][0];
 			center_z = spherePos[0][1];
 
 		}
-	}
+	}*/ //안 쓰는 함수
 
 
 	bool create(IDirect3DDevice9* pDevice, D3DXCOLOR color = d3d::WHITE, float radius = M_RADIUS) // Default값 반지름을 가지면서 원할시 반지름 변경 가능.
@@ -209,7 +241,7 @@ public:
 	{
 
 		if (hasIntersected(ball)) { // 충돌이 발생 할때
-			ball.set_nochangetime(2); // 2번 돌때 동안은 변화 무시
+			ball.set_nochangetime(3); // 3번 돌때 동안은 변화 무시
 
 
 			// 원하는 분포와 범위로 랜덤 실수 생성
@@ -224,37 +256,37 @@ public:
 
 			if (abs(-ball.getVelocity_X() + random_number1) < 2) { // 너무 느려지는 거 방지용 속도 보정
 				if (-ball.getVelocity_X() + random_number1 >= 0) {
-					speedup1 = 2;
+					speedup1 = 2.5;
 				}
 				else {
-					speedup1 = -2;
+					speedup1 = -2.5;
 				}
 			}
 
 			if (abs(-ball.getVelocity_Z() + random_number2) < 2) {
 				if (-ball.getVelocity_Z() + random_number2 >= 0) {
-					speedup2 = 2;
+					speedup2 = 2.5;
 				}
 				else {
-					speedup2 = -2;
+					speedup2 = -2.5;
 				}
 			}
 
 			if (abs(getVelocity_X() + random_number1) < 2) {
 				if (getVelocity_X() + random_number1 >= 0) {
-					speedup3 = 2;
+					speedup3 = 2.5;
 				}
 				else {
-					speedup3 = -2;
+					speedup3 = -2.5;
 				}
 			}
 
 			if (abs(getVelocity_Z() + random_number2) < 2) {
 				if (getVelocity_Z() + random_number2 >= 0) {
-					speedup4 = 2;
+					speedup4 = 2.5;
 				}
 				else {
-					speedup4 = -2;
+					speedup4 = -2.5;
 				}
 			}
 
@@ -364,7 +396,7 @@ public:
 private:
 	D3DXMATRIX              m_mLocal;
 	D3DMATERIAL9            m_mtrl;
-	ID3DXMesh* m_pSphereMesh;
+	ID3DXMesh*				m_pSphereMesh;
 
 };
 
@@ -484,7 +516,7 @@ public:
 	void hitBy(CSphere& ball)
 	{
 		if (hasIntersected(ball)) {
-			ball.set_nochangetime(10); // 5번 돌때 동안은 변화 무시
+			ball.set_nochangetime(10); // 10번 돌때 동안은 변화 무시
 			float speedup = 0;
 			if (abs(ball.getVelocity_X()) <= 2) { // 공이 너무 느려짐을 방지
 				if (ball.getVelocity_X() > 0) {
@@ -667,6 +699,101 @@ private:
 	d3d::BoundingSphere m_bound;
 };
 
+class CLife {
+private:
+	float					center_x, center_y, center_z;
+	float                   m_radius = 0.15f;
+
+public:
+	CLife(void)
+	{
+		D3DXMatrixIdentity(&m_mLocal);
+		ZeroMemory(&m_mtrl, sizeof(m_mtrl));
+		m_pSphereMesh = NULL;
+	}
+	~CLife(void) {}
+
+public:
+
+	inline float get_centerx() { //center_x 얻기
+		return center_x;
+	}
+
+	inline float get_centery() { //center_y 얻기
+		return center_y;
+	}
+
+	inline float get_centerz() { //center_z 얻기
+		return center_z;
+	}
+
+
+	float getRadius(void)  const { return (float)(m_radius); }
+
+	bool create(IDirect3DDevice9* pDevice)
+	{
+		if (NULL == pDevice)
+			return false;
+
+		D3DXCOLOR color = d3d::YELLOW; //색
+
+		m_mtrl.Ambient = color;
+		m_mtrl.Diffuse = color;
+		m_mtrl.Specular = color;
+		m_mtrl.Emissive = d3d::RED;
+		m_mtrl.Power = 5.0f;
+
+		if (FAILED(D3DXCreateSphere(pDevice, getRadius(), 50, 50, &m_pSphereMesh, NULL)))
+			return false;
+		return true;
+	}
+
+	void destroy(void)
+	{
+		if (m_pSphereMesh != NULL) {
+			m_pSphereMesh->Release();
+			m_pSphereMesh = NULL;
+		}
+	}
+
+	void draw(IDirect3DDevice9* pDevice, const D3DXMATRIX& mWorld)
+	{
+		if (NULL == pDevice)
+			return;
+		pDevice->SetTransform(D3DTS_WORLD, &mWorld);
+		pDevice->MultiplyTransform(D3DTS_WORLD, &m_mLocal);
+		pDevice->SetMaterial(&m_mtrl);
+		m_pSphereMesh->DrawSubset(0);
+	}
+
+
+	void setCenter(float x, float y, float z)
+	{
+		D3DXMATRIX m;
+		center_x = x;	center_y = y;	center_z = z;
+		m_radius = y;
+		D3DXMatrixTranslation(&m, x, y, z);
+		setLocalTransform(m);
+	}
+
+	const D3DXMATRIX& getLocalTransform(void) const { return m_mLocal; }
+	void setLocalTransform(const D3DXMATRIX& mLocal) { m_mLocal = mLocal; }
+	D3DXVECTOR3 getCenter(void) const
+	{
+		D3DXVECTOR3 org(center_x, center_y, center_z);
+		return org;
+	}
+
+private:
+	D3DXMATRIX              m_mLocal;
+	D3DMATERIAL9            m_mtrl;
+	ID3DXMesh* m_pSphereMesh;
+
+};
+
+
+
+
 // -----------------------------------------------------------------------------
 // Global variables
 // -----------------------------------------------------------------------------
@@ -674,17 +801,17 @@ CWall	g_legoPlane;
 CWall	g_legowall[4];
 CSphere	g_sphere[10];
 CSphere	g_target_blueball;
-CSphere extra_whiteball[5]; // 추가 흰 공
+CSphere whiteball[5]; // 흰 공
 CLight	g_light;
 CWall move_board; // 움직이는 판
-int ball_count = 1;
+CLife	g_life[5]; //생명
 
 //아이템 클래스
 class Item // I는 대문자 i 임(item)
 {
 public:
 	int choose_random_item() { //4가지 아이템중 랜덤으로 얻을 아이템을 정하는 함수
-		//return 2; // 디버깅 용 코드. 원하는 아이템 번호 삽입
+		return 2; // 디버깅 용 코드. 원하는 아이템 번호 삽입
 		std::uniform_int_distribution<int> distribution(1, 4); // 4가지 아이템이 존재
 		int random_number = distribution(gen);
 		return random_number; // 정해진 랜덤 숫자(정수) 반환
@@ -708,18 +835,12 @@ public:
 	}
 
 	void plus_whiteball() { // 추가 공을 생성한다.
-		if (ball_count < Max_Whiteball) {
-			if (!g_sphere[0].get_exist()) {
-				g_sphere[0].set_exist(true); //눈에 보이게 함
-				g_sphere[0].setPower(1.3, -1.3);
-				ball_count += 1;
-				return;
-			}
-			for (int i = 0; i < Max_Whiteball - 1; i++) {
-				if (!extra_whiteball[i].get_exist()) {
-					extra_whiteball[i].set_exist(true); //눈에 보이게 함
-					extra_whiteball[i].setPower(1.3, -1.3);
-					ball_count += 1;
+		if (ballCnt < Max_Whiteball) {
+			for (int i = 0; i < Max_Whiteball ; i++) {
+				if (!whiteball[i].get_exist()) {
+					whiteball[i].set_exist(true); //눈에 보이게 함
+					whiteball[i].setPower(1.5, 1.5);
+					ballCnt += 1;
 					return;
 				}
 			}
@@ -727,7 +848,9 @@ public:
 	}
 
 	void plus_life() { // 생명을 1 추가 한다.
-		//life+=1; //그냥 생명 추가 1...
+		if (lifeCnt < Max_life) {
+			lifeCnt += 1;
+		} //최대 생명보다 생명이 작을 때 생명 추가 1...
 	}
 
 	void ignore_collision() { //일정 시간동안 공이 직선으로 날아가게 한다.
@@ -805,6 +928,15 @@ double g_camera_pos[3] = { 0.0, 0.0, -0.0 };
 // Functions
 // -----------------------------------------------------------------------------
 
+void exitProgram() {//종료 함수
+	for (int i = 0; i < 10; i++)
+		g_sphere[i].set_exist(false);
+	for (int i = 0; i < Max_Whiteball; i++) {
+		whiteball[i].set_exist(false);
+	}
+
+}
+
 
 void destroyAllLegoBlock(void)
 {
@@ -820,21 +952,21 @@ bool Setup()
 	D3DXMatrixIdentity(&g_mProj);
 
 	// create plane and set the position
-	if (false == g_legoPlane.create(Device, -1, -1, 6, 0.2f, 9, d3d::GREEN)) return false; //Device, ? , ?,  가로, 두께, 높이, 색깔
+	if (false == g_legoPlane.create(Device, -1, -1, Wall_width, 0.2f, Wall_height, d3d::GREEN)) return false; //Device, ? , ?,  가로, 두께, 높이, 색깔
 	g_legoPlane.setPosition(0.0f, -0.0006f / 5, 0.0f);
 
 	// create walls and set the position. note that there are four walls
-	if (false == g_legowall[0].create(Device, -1, -1, 0.3f, 0.3f, 9.0f, d3d::BLACK)) return false; //왼쪽벽
-	g_legowall[0].setPosition(-3.1f, 0.12f, 0.0f);
+	if (false == g_legowall[0].create(Device, -1, -1, Wall_thickness, Wall_thickness, Wall_height, d3d::BLACK)) return false; //왼쪽벽
+	g_legowall[0].setPosition(-3.5f, 0.12f, 0.0f);
 
-	if (false == g_legowall[1].create(Device, -1, -1, 6.6, 0.3f, 0.3f, d3d::BLACK)) return false; //위쪽 벽
-	g_legowall[1].setPosition(0.0f, 0.12f, 4.5f);
+	if (false == g_legowall[1].create(Device, -1, -1, Wall_width, Wall_thickness, Wall_thickness, d3d::BLACK)) return false; //위쪽 벽
+	g_legowall[1].setPosition(0.0f, 0.12f, 4.95f);
 
-	if (false == g_legowall[2].create(Device, -1, -1, 0.3f, 0.3f, 9.0f, d3d::BLACK)) return false; // 오른쪽 벽
-	g_legowall[2].setPosition(3.1f, 0.12f, 0.0f);
+	if (false == g_legowall[2].create(Device, -1, -1, Wall_thickness, Wall_thickness, Wall_height, d3d::BLACK)) return false; // 오른쪽 벽
+	g_legowall[2].setPosition(3.5f, 0.12f, 0.0f);
 
 	if (false == move_board.create(Device, -1, -1, 1, 0.4f, 0.15f, d3d::CYAN)) return false;  //	움직이는 판
-	move_board.setPosition(0.0f, 0.12f, -4.2f);
+	move_board.setPosition(0.0f, 0.12f, -4.7f);
 
 	for (int i = 0; i < 3; i++) {
 		g_legowall[i].setwallnum(i);
@@ -849,19 +981,20 @@ bool Setup()
 		g_sphere[i].setPower(0, 0);
 	}
 
-	for (i = 0; i < Max_Whiteball - 1; i++) { //*** 추가 흰공 초기화***
-		if (false == extra_whiteball[i].create(Device, sphereColor[0])) return false;
-		extra_whiteball[i].setCenter(extra_whitePos[i][0], (float)extra_whiteball[i].getRadius(), extra_whitePos[i][1]);
-		extra_whiteball[i].setPower(0, 0);
-		extra_whiteball[i].set_whiteball(true); //***추가공***
-		extra_whiteball[i].set_exist(false); //***처음에는 추가공 안 보이게 설정***
+	for (i = 0; i < Max_Whiteball ; i++) { //*** 흰공 초기화***
+		if (false == whiteball[i].create(Device, d3d::WHITE)) return false;
+		whiteball[i].setCenter(whitePos[i][0], (float)whiteball[i].getRadius(), whitePos[i][1]);
+		whiteball[i].setPower(0, 0);
+		whiteball[i].set_whiteball(true); 
+		whiteball[i].set_exist(false); //***처음에는 추가공 안 보이게 설정***
 	}
 
+	whiteball[0].set_exist(true); // 처음 흰공 1개는 보여야함
 
 	/*for (int i = 1; i<10; i++) { // 디버깅 확인용 모든 공에 아이템 속성 부여
 		g_sphere[i].set_item(true);
 	}*/
-	
+
 
 	g_sphere[8].set_item(true);
 	g_sphere[9].set_item(true);
@@ -869,9 +1002,13 @@ bool Setup()
 	// create blue ball for set direction
 	//if (false == g_target_blueball.create(Device, d3d::BLUE)) return false; // 수정) 이 공이 마우스 좌클릭으로 움직이는 공임. 원하는 색깔 변경 가능.(기존 파란색)
 	//g_target_blueball.setCenter(-0.0f, (float)g_target_blueball.getRadius(), -4.2f); // 움직이는 공의 초기 좌표 설정. 첫번째게 x축, 세번째게 z축 위치
-
-	g_sphere[0].set_whiteball(true); // 충돌에도 안 없어지게 하기 위한 설정
 	//g_target_blueball.set_whiteball(true); // 충돌에도 안 없어지게 하기 위한 설정
+
+	//life 생성
+	for (i = 0; i < 5; i++) {
+		if (false == g_life[i].create(Device)) return false;
+		g_life[i].setCenter((life_x - life_interval * i), (float)g_life[i].getRadius(), life_height);
+	}
 
 
 	// light setting 
@@ -936,10 +1073,10 @@ bool Display(float timeDelta)
 		// update the position of each ball. during update, check whether each ball hit by walls.
 		for (i = 0; i < 10; i++) {
 			for (j = 0; j < 3; j++) {
-				g_legowall[j].hitBy(g_sphere[i]);
-				for (int k = 0; k < Max_Whiteball - 1; k++) {
-					if (extra_whiteball[k].get_exist()) {
-						g_legowall[j].hitBy(extra_whiteball[k]);
+				//g_legowall[j].hitBy(g_sphere[i]);
+				for (int k = 0; k < Max_Whiteball; k++) {
+					if (whiteball[k].get_exist()) {
+						g_legowall[j].hitBy(whiteball[k]);
 					}
 				}
 			}
@@ -948,21 +1085,17 @@ bool Display(float timeDelta)
 			move_board.hitBy(g_sphere[i]);
 		}
 
-		for (i = 0; i < Max_Whiteball - 1; i++) {
-			extra_whiteball[i].ballUpdate(timeDelta);
-			move_board.hitBy(extra_whiteball[i]);
+		for (i = 0; i < Max_Whiteball ; i++) {
+			whiteball[i].ballUpdate(timeDelta);
+			move_board.hitBy(whiteball[i]);
 		}
 
 		// check whether any two balls hit together and update the direction of balls
-		for (i = 1; i < 10; i++) {
+		for (i = 0; i < 10; i++) {
 			if (g_sphere[i].get_exist()) { // i 공이  실재로 존재하면 i공과 움직이는 공의 충돌 확인
-				if (g_sphere[0].get_exist()) {
-					g_sphere[0].hitBy(g_sphere[i]);
-				}
-
-				for (j = 0; j < Max_Whiteball - 1; j++) { // 추가 흰공이 존재하면 충돌 확인
-					if (extra_whiteball[j].get_exist()) {
-						extra_whiteball[j].hitBy(g_sphere[i]);
+				for (j = 0; j < Max_Whiteball ; j++) { // 추가 흰공이 존재하면 충돌 확인
+					if (whiteball[j].get_exist()) {
+						whiteball[j].hitBy(g_sphere[i]);
 					}
 
 				}
@@ -991,32 +1124,34 @@ bool Display(float timeDelta)
 		}
 
 		//g_target_blueball.hitBy(g_sphere[0]); // 파란공과 흰공 충돌 확인
+	
+		bool incorrect_positionbug = false;
 
-		if (g_sphere[0].is_balloutside()) { //움직이는 공이 규격장 밖으로 나가면 공의 초기화 시킴.
-			g_sphere[0].destroy();
-			if (false == g_sphere[0].create(Device, sphereColor[0])) return false;
-			g_sphere[0].setCenter(spherePos[0][0], (float)g_sphere[0].getRadius(), spherePos[0][1]);
-			g_sphere[0].setPower(0, 0);
-			g_sphere[0].set_exist(false);
-			ball_count -= 1;
-		}
+		for (int i = 0; i < Max_Whiteball ; i++) {
+			if (whiteball[i].is_balloutside(incorrect_positionbug)) { //움직이는 공이 규격장 밖으로 나가면 공의 초기화 시킴.
+				whiteball[i].destroy();
+				whiteball[i].create(Device, d3d::WHITE);
+				if (incorrect_positionbug) { // 버그가 발생한 경우 공을 올바른 위치로 재생성후 진행
+					whiteball[i].setCenter(whitePos[i][0], (float)whiteball[i].getRadius(), whitePos[i][1]);
+					whiteball[i].setPower(1, -1);
+					whiteball[i].set_exist(true);
+				}
+				else { // 버그가 아닌 경우 공이 안보이게
+					whiteball[i].setCenter(whitePos[i][0], (float)whiteball[i].getRadius(), whitePos[i][1]);
+					whiteball[i].setPower(0, 0);
+					whiteball[i].set_exist(false);
+				}
 
-		for (int i = 0; i < Max_Whiteball - 1; i++) {
-			if (extra_whiteball[i].is_balloutside()) { //움직이는 공이 규격장 밖으로 나가면 공의 초기화 시킴.
-				extra_whiteball[i].destroy();
-				if (false == extra_whiteball[i].create(Device, sphereColor[0])) return false;
-				extra_whiteball[i].setCenter(extra_whitePos[i][0], (float)extra_whiteball[i].getRadius(), extra_whitePos[i][1]);
-				extra_whiteball[i].setPower(0, 0);
-				extra_whiteball[i].set_exist(false);
-				ball_count -= 1;
 			}
 
 		}
 
-		if (ball_count == 0) {
-			ball_count = 1;
-			g_sphere[0].set_exist(true);
-			//life-=1;			// 생명을 1 깍는다.
+		if (ballCnt == 0) { // 공이 0 개인 경우 생명을 1깍고 흰공 1개 생성
+			ballCnt = 1;
+			minus_lifeCnt();			// 생명을 1 깍는다.
+			if (lifeCnt > 0) {
+				whiteball[0].set_exist(true);
+			}
 		}
 
 
@@ -1036,12 +1171,14 @@ bool Display(float timeDelta)
 			}
 		}
 
-		for (i = 0; i < Max_Whiteball - 1; i++) {
-			if (extra_whiteball[i].get_exist()) {
-				extra_whiteball[i].draw(Device, g_mWorld);
+		for (i = 0; i < Max_Whiteball ; i++) {
+			if (whiteball[i].get_exist()) {
+				whiteball[i].draw(Device, g_mWorld);
 			}
-
 		}
+
+		for (i = 0; i < lifeCnt; i++)
+			g_life[i].draw(Device, g_mWorld);
 		//g_target_blueball.draw(Device, g_mWorld);
 	   // g_light.draw(Device); // 빛 위치 끄기
 
@@ -1082,14 +1219,14 @@ LRESULT CALLBACK d3d::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case VK_SPACE:
 
 			D3DXVECTOR3 targetpos = move_board.getCenter(); // 이부분을 수정하면 공의 목적지가 변형 됩니다.
-			D3DXVECTOR3	whitepos = g_sphere[0].getCenter(); // 이부분을 수정하면 발사되는 공이 수정 됩니다.
+			D3DXVECTOR3	whitepos = whiteball[0].getCenter(); // 이부분을 수정하면 발사되는 공이 수정 됩니다.
 			double theta = acos(sqrt(pow(targetpos.x - whitepos.x, 2)) / sqrt(pow(targetpos.x - whitepos.x, 2) +
 				pow(targetpos.z - whitepos.z, 2)));		// 기본 1 사분면
 			if (targetpos.z - whitepos.z <= 0 && targetpos.x - whitepos.x >= 0) { theta = -theta; }	//4 사분면
 			if (targetpos.z - whitepos.z >= 0 && targetpos.x - whitepos.x <= 0) { theta = PI - theta; } //2 사분면
 			if (targetpos.z - whitepos.z <= 0 && targetpos.x - whitepos.x <= 0) { theta = PI + theta; } // 3 사분면
 			double distance = sqrt(pow(targetpos.x - whitepos.x, 2) + pow(targetpos.z - whitepos.z, 2));
-			g_sphere[0].setPower(distance * cos(theta), distance * sin(theta)); // 앞의 객체를 발사하는 공으로 변경하면 됩니다.
+			whiteball[0].setPower(distance* cos(theta), distance* sin(theta)); // 앞의 객체를 발사하는 공으로 변경하면 됩니다.
 
 			break;
 		}
