@@ -805,14 +805,27 @@ bool Display(float timeDelta)
 
 			//existing balls down.
 			monsterGenerator.setMonstersDown();
+			std::vector<float> before_xvalue;
 			//set a new balls
 			for (i = 0; i < 10; i++) {
 				CSphere sphere;
 				// 원하는 분포와 범위로 랜덤 실수 생성
-				std::uniform_real_distribution<float> distribution(-3.1, 3.1);
-				float random_x;
-				random_x = distribution(gen);
-				float new_ball_pos[2] = { random_x,startpos_y };
+
+				std::uniform_real_distribution<float> distribution(M_RADIUS, 6.2 - M_RADIUS);
+				float random_value = distribution(gen);
+				if (i != 0) {
+					for (j = 0; j < before_xvalue.size(); j++)
+					{
+						//if random value is nesting
+						if (random_value > before_xvalue[j] - M_RADIUS * 2 && random_value < before_xvalue[j] + M_RADIUS * 2) {
+							random_value = distribution(gen);
+							j -= 1;
+							continue;
+						}
+					}
+				}
+				before_xvalue.push_back(random_value);
+				float new_ball_pos[2] = { random_value - 3.2,startpos_y };
 				if (false == sphere.create(Device, d3d::RED)) return false;
 				monsterGenerator.setMonsters(new_ball_pos, sphere);
 			}
