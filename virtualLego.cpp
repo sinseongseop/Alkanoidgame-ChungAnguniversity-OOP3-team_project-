@@ -128,10 +128,6 @@ public:
 		}
 	}
 
-	void set_ball_down() {
-		setCenter(center_x, center_y, center_z - m_radius);
-		//center_z-m_radius의 값이 바닥보다 작아진다면
-	}
 
 
 	bool create(IDirect3DDevice9* pDevice, D3DXCOLOR color = d3d::WHITE, float radius = M_RADIUS) // Default값 반지름을 가지면서 원할시 반지름 변경 가능.
@@ -183,7 +179,6 @@ public:
 		else {
 			return false;
 		}
-
 	}
 
 	void hitBy(CSphere& ball)
@@ -347,15 +342,17 @@ class MonsterGenerator
 {
 private:
 	std::vector<CSphere> monsters;
-	clock_t start_time;
-	double duration;
+	__int64 afterTime = 0;
+	__int64 beforeTime = 0;
+	__int64 periodFrequency = 0;
+	double timeScale = 0;
+	double deltaTime = 0;
 
 public:
 	//make a monsters
 	void setMonsters(float pos[2], CSphere monster) {
 		monster.setCenter(pos[0], (float)monster.getRadius(), pos[1]);
 		monster.setPower(0, 0);
-		monster.set_ball_down();
 		monsters.push_back(monster);
 	}
 
@@ -374,9 +371,40 @@ public:
 	int getCountMonsters() {
 		return monsters.size();
 	}
-	time_t getduration() {
-		duration = (double)(clock() - start_time) / CLOCKS_PER_SEC;
-		return duration;
+	float getDeltaTime() {
+
+		//QueryPerformanceFrequency((LARGE_INTEGER*)&periodFrequency);	// 1초동안 CPU의 진동수를 반환하는 함수 (고정값. 시스템 부팅시 고정됨)
+		//timeScale = 1.0 / (double)periodFrequency;				// 미리 역수로 만들기
+
+		//QueryPerformanceCounter((LARGE_INTEGER*)&beforeTime);	// 이전 프레임 진동수 측정
+
+
+		//while (1) {
+
+		//	QueryPerformanceCounter((LARGE_INTEGER*)&afterTime);	// 현재 프레임 진동수 측정
+
+		//	deltaTime = ((double)afterTime - (double)beforeTime) * timeScale;	// 계산 (deltaTime 단위: ms)
+
+		//	if (deltaTime > 1000) {
+		//		break;
+		//	}
+
+		//}
+
+		//return true;
+		return deltaTime;
+
+	}
+	void addDeltaTime(float deltaTime) {
+		this->deltaTime += deltaTime;
+	}
+	void resetDeltaTime() {
+		this->deltaTime = 0;
+	}
+	void setMonstersDown() {
+		for (int i = 0; i < monsters.size(); i++) {
+			monsters[i].setCenter(monsters[i].get_centerx(), monsters[i].get_centery(), monsters[i].get_centerz() - 1.0f);
+		}
 	}
 };
 
@@ -771,23 +799,24 @@ bool Display(float timeDelta)
 		Device->Clear(0, 0, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0x00afafaf, 1.0f, 0);
 		Device->BeginScene();
 
+		monsterGenerator.addDeltaTime(timeDelta);
 		//if duration>1s, set a new balls
-		if (monsterGenerator.getduration() > 1) {
+		if (monsterGenerator.getDeltaTime() > 1.0) {
+
 			//existing balls down.
-			for (i = 0; i < monsterGenerator.getCountMonsters(); i++) {
-				monsterGenerator.getMonster(i).set_ball_down();
-			}
+			monsterGenerator.setMonstersDown();
 			//set a new balls
 			for (i = 0; i < 10; i++) {
 				CSphere sphere;
 				// 원하는 분포와 범위로 랜덤 실수 생성
-				std::uniform_real_distribution<double> distribution(-3.1, 3.1);
-				double random_y;
-
-				if (false == sphere.create(Device, sphereColor[i])) return false;
-				monsterGenerator.setMonsters(spherePos[i], sphere);
+				std::uniform_real_distribution<float> distribution(-3.1, 3.1);
+				float random_x;
+				random_x = distribution(gen);
+				float new_ball_pos[2] = { random_x,startpos_y };
+				if (false == sphere.create(Device, d3d::RED)) return false;
+				monsterGenerator.setMonsters(new_ball_pos, sphere);
 			}
-
+			monsterGenerator.resetDeltaTime();
 		}
 
 		//player update
@@ -837,6 +866,7 @@ bool Display(float timeDelta)
 		if (white_ball.get_exist()) {
 			white_ball.draw(Device, g_mWorld);
 		}
+
 		for (i = 0; i < monsterGenerator.getCountMonsters(); i++) {
 			CSphere monster = monsterGenerator.getMonster(i);
 			if (monster.get_exist()) {
